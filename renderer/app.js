@@ -17,7 +17,7 @@ import {
   getFirestore, doc, getDoc, collection, query, where, limit, getDocs,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getDatabase, ref, push, set, update, remove, onValue, onDisconnect,
+  getDatabase, forceWebSockets, ref, push, set, update, remove, onValue, onDisconnect,
   serverTimestamp as dbNow,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -36,6 +36,12 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const fs = getFirestore(fbApp);
+// WebSocket only. The SDK marks WebSockets as failed before every attempt and
+// clears the mark once one succeeds, so a quit or a wifi drop mid-connect
+// leaves it set — and from then on it opens with long-polling, which loads
+// scripts from the database host that our CSP rightly blocks. That stranded
+// the agent on "can't reach the organisers' dashboard" for good.
+forceWebSockets();
 const rdb = getDatabase(fbApp);
 
 const SEGMENT_MS = 20_000;   // each clip covers this much
