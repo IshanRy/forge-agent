@@ -17,13 +17,15 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: node -e 'require("fs").writeFileSync("oauth.json", JSON.stringify({clientId:process.env.ID||"",clientSecret:process.env.SECRET||""}))'
+      - run: |
+          node -e 'require("fs").writeFileSync("oauth.json", JSON.stringify({clientId:process.env.ID||"",clientSecret:process.env.SECRET||""}))'
         env:
           ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       - run: npx electron-builder --mac --arm64 --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      - run: gh release create "v$(node -p 'require("./package.json").version')-${{ github.run_number }}" dist/TheForgeAgent-arm64.dmg dist/TheForgeAgent-x64.dmg --title "The Forge Agent (build ${{ github.run_number }})" --notes "Unsigned build. First open: right-click the app → Open." --latest
+      - run: |
+          gh release create "v$(node -p 'require("./package.json").version')-${{ github.run_number }}" dist/TheForgeAgent-arm64.dmg dist/TheForgeAgent-x64.dmg --title "The Forge Agent (build ${{ github.run_number }})" --notes "Unsigned build. First open: right-click the app → Open." --latest
         env:
           GH_TOKEN: ${{ github.token }}
