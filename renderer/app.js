@@ -394,6 +394,7 @@ function watchFreeze() {
     if (on === frozen) return;
     frozen = on;
     window.forge.setFrozen(on);
+    if (on) reportFreeze(true);
     if (on) {
       $("frozenWhen").textContent = `Paused at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       show("scFrozen");
@@ -401,6 +402,23 @@ function watchFreeze() {
       show("scRun");
     }
   }, () => { /* unreadable freeze must not take the agent down */ });
+}
+
+/* Leaving the freeze screen, and input while away from it, as the main
+   process sees them. Counts restart with each freeze. Written to this
+   participant's presence meta, throttled — raw numbers, no verdict. */
+let freezeLeft = 0, freezeActive = 0, freezeDirty = false;
+window.forge.onFreezeLeft(() => { freezeLeft += 1; reportFreeze(); });
+window.forge.onFreezeActive(() => { freezeActive += 1; freezeDirty = true; });
+setInterval(() => { if (freezeDirty) reportFreeze(); }, 5000);
+
+function reportFreeze(reset = false) {
+  if (reset) { freezeLeft = 0; freezeActive = 0; }
+  freezeDirty = false;
+  if (!me) return;
+  update(ref(rdb, `presence/${me.uid}/meta`), {
+    freezeLeft, freezeActive, freezeLeftAt: dbNow(),
+  }).catch(() => { /* rules not deployed yet: nothing to report to */ });
 }
 
 function watchPulls() {

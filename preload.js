@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("forge", {
   googleSignIn: () => ipcRenderer.invoke("auth:google"),
 
   setFrozen: (on) => ipcRenderer.invoke("freeze:set", on),
+  onFreezeLeft: (fn) => ipcRenderer.on("freeze:left", () => fn()),
+  onFreezeActive: (fn) => ipcRenderer.on("freeze:active", () => fn()),
 
   sample: () => ipcRenderer.invoke("sample:now"),
   poster: () => ipcRenderer.invoke("screen:poster"),

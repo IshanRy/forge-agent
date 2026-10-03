@@ -6,7 +6,7 @@
 // presence, and the rolling screen buffer.
 
 const {
-  app, protocol, net, session, screen, shell, dialog,
+  app, protocol, net, session, screen, shell, dialog, powerMonitor,
   BrowserWindow, desktopCapturer, systemPreferences, ipcMain,
 } = require("electron");
 
@@ -48,6 +48,35 @@ const GOOGLE_OAUTH = (() => {
   try { return require("./oauth.json"); }
   catch { return { clientId: "", clientSecret: "" }; }
 })();
+
+/* ------------------------------------------------------------------
+   While frozen: the window cannot be minimised, and if it is hidden or
+   loses focus anyway (Cmd-Tab, Mission Control, another Space) it is pulled
+   back. Each time that happens is counted, and so is every second of
+   keyboard or mouse input while the freeze screen was not in front —
+   macOS's system idle timer gives that without any permission. Both go to
+   the dashboard as plain numbers; what they mean is the organisers' call.
+   ------------------------------------------------------------------ */
+let frozen = false, freezeWatch = null, awayFlag = false;
+
+function pullBack() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.setFullScreen(true);
+  win.focus();
+}
+
+function watchFreeze() {
+  if (!frozen || !win || win.isDestroyed()) return;
+  const away = win.isMinimized() || !win.isVisible() || !win.isFocused();
+  const active = away && powerMonitor.getSystemIdleTime() <= 1;
+  if (away && !awayFlag) win.webContents.send("freeze:left");
+  if (active) win.webContents.send("freeze:active");
+  awayFlag = away;
+  if (away) pullBack();
+}
 
 const OAUTH_TIMEOUT_MS = 180_000;
 let oauthInFlight = false;
@@ -355,13 +384,15 @@ function registerIpc() {
      from across the room, not a cage. */
   ipcMain.handle("freeze:set", (_e, on) => {
     if (!win || win.isDestroyed()) return;
+    frozen = on;
+    win.setMinimizable(!on);
     if (on) {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.setAlwaysOnTop(true, "screen-saver");
-      win.setFullScreen(true);
-      win.focus();
+      pullBack();
+      clearInterval(freezeWatch);
+      freezeWatch = setInterval(watchFreeze, 1000);
     } else {
+      clearInterval(freezeWatch);
+      awayFlag = false;
       win.setFullScreen(false);
       win.setAlwaysOnTop(false);
     }
