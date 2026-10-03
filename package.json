@@ -1,0 +1,52 @@
+{
+  "name": "forge-agent",
+  "productName": "The Forge Agent",
+  "version": "1.0.0",
+  "description": "Activity and screen-buffer agent for The Forge hackathon.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --forge-dev",
+    "dist": "electron-builder --mac --arm64 --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.theforge.agent",
+    "productName": "The Forge Agent",
+    "files": [
+      "main.js",
+      "preload.js",
+      "sampler.js",
+      "renderer/**/*",
+      "oauth.json"
+    ],
+    "afterPack": "scripts/adhoc-sign.js",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "The Forge Agent reads the titles of your open windows so hackathon organisers can see what you are working on. Without this it can only list running applications.",
+        "LSMinimumSystemVersion": "12.0"
+      }
+    },
+    "dmg": {
+      "sign": false,
+      "artifactName": "TheForgeAgent-${arch}.dmg"
+    }
+  }
+}

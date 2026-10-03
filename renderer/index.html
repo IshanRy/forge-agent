@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' https://www.gstatic.com;
+  style-src 'self' 'unsafe-inline';
+  font-src 'self';
+  img-src 'self' data: blob:;
+  media-src 'self' blob:;
+  connect-src 'self' https://www.gstatic.com
+              https://identitytoolkit.googleapis.com
+              https://securetoken.googleapis.com
+              https://firestore.googleapis.com
+              https://*.firebasedatabase.app
+              wss://*.firebasedatabase.app;
+">
+<title>The Forge Agent</title>
+<style>
+  @font-face{
+    font-family:"HN Light";
+    src:url("Light.ttf") format("truetype");
+    font-weight:300;
+    font-display:block;
+  }
+  :root{
+    color-scheme:dark;
+    --ink:#efe9e1;
+    --dim:#a19a90;
+    --faint:#57524b;
+    --rule:rgba(239,233,225,.14);
+    --warn:#e6a08a;
+    --gut:clamp(20px,5vw,56px);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    background:#000; color:var(--ink);
+    font-family:"HN Light","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight:300;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+    user-select:none;
+  }
+  .screen{ display:none; min-height:100vh; padding:clamp(28px,6vh,64px) var(--gut); }
+  .screen.show{ display:flex; flex-direction:column; }
+  .mid{ align-items:center; justify-content:center; text-align:center; }
+  .wrap{ width:100%; max-width:620px; margin:0 auto; }
+
+  .mark{ font-size:12px; letter-spacing:.3em; text-transform:uppercase; color:var(--dim); }
+  h1{ font-weight:300; font-size:26px; margin:18px 0 10px; }
+  h2{ font-weight:300; font-size:15px; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--dim); margin:0 0 14px; }
+  p{ margin:0 0 12px; color:var(--dim); font-size:14px; }
+  p.tight{ margin-bottom:6px; }
+  .note{ font-size:12px; color:var(--faint); }
+  .note.warn{ color:var(--warn); }
+  code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+        background:rgba(255,255,255,.08); padding:.1em .4em; border-radius:4px;
+        user-select:text; }
+
+  ul.plain{ margin:0 0 18px; padding:0 0 0 18px; color:var(--dim); font-size:14px; }
+  ul.plain li{ margin-bottom:7px; }
+
+  .card{ border:1px solid var(--rule); border-radius:12px; padding:22px; text-align:left;
+         margin-bottom:18px; }
+
+  label.k{ display:block; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+           color:var(--faint); margin-bottom:6px; }
+  input{
+    width:100%; padding:11px 13px; font:inherit; font-size:14px; color:var(--ink);
+    background:rgba(255,255,255,.04); border:1px solid var(--rule); border-radius:8px;
+    outline:none; margin-bottom:14px; user-select:text;
+  }
+  input:focus{ border-color:rgba(239,233,225,.5); }
+
+  button{ font:inherit; cursor:pointer; }
+  .solid{ padding:11px 24px; border:0; border-radius:8px; background:var(--ink); color:#000;
+          font-size:13px; }
+  .solid:disabled{ opacity:.45; cursor:default; }
+  .ghost{ padding:10px 18px; font-size:12px; letter-spacing:.06em; border-radius:8px;
+          border:1px solid var(--rule); background:transparent; color:var(--ink); }
+  .ghost:hover{ border-color:rgba(239,233,225,.5); }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  .msg{ font-size:13px; color:var(--warn); min-height:19px; margin-bottom:4px; }
+  .or{ display:flex; align-items:center; gap:12px; margin:18px 0 14px;
+       font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); }
+  .or::before, .or::after{ content:""; flex:1; height:1px; background:var(--rule); }
+
+  /* permission list */
+  .perm{ display:flex; align-items:flex-start; gap:14px; padding:16px 0;
+         border-top:1px solid var(--rule); text-align:left; }
+  .perm:first-of-type{ border-top:0; }
+  .perm .body{ flex:1 1 auto; }
+  .perm .name{ font-size:14px; }
+  .perm .why{ font-size:12px; color:var(--faint); margin-top:3px; }
+  .dot{ flex:0 0 auto; width:8px; height:8px; border-radius:999px; margin-top:8px;
+        background:var(--faint); }
+  .dot.ok{ background:var(--ink); }
+  .dot.no{ background:var(--warn); }
+
+  /* running */
+  .statusbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
+              flex-wrap:wrap; padding-bottom:20px; border-bottom:1px solid var(--rule);
+              margin-bottom:26px; }
+  .live{ display:flex; align-items:center; gap:10px; font-size:14px; }
+  .live .dot{ margin-top:0; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:18px;
+         margin-bottom:26px; }
+  .tile{ border:1px solid var(--rule); border-radius:10px; padding:16px 18px; }
+  .tile .v{ font-size:19px; }
+  .tile .k{ margin-top:6px; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+            color:var(--dim); }
+  .feed{ font-size:13px; color:var(--dim); }
+  .feed div{ padding:7px 0; border-top:1px solid var(--rule); overflow:hidden;
+             text-overflow:ellipsis; white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<!-- 1. what this collects, before anything is collected -->
+<section id="scConsent" class="screen mid">
+  <div class="wrap">
+    <div class="mark">The Forge</div>
+    <h1>This app watches your screen</h1>
+    <p>Read this before you start. It is short and it is all of it.</p>
+
+    <div class="card">
+      <h2>What leaves your Mac</h2>
+      <ul class="plain">
+        <li>The titles of your open windows, including browser tab titles, about
+          every 10 seconds. Not page contents, not URLs, not keystrokes.</li>
+        <li>The names of applications you are running.</li>
+        <li>Whether this app is open, and when it was last heard from.</li>
+        <li>Your name and email, so organisers know whose machine this is.</li>
+      </ul>
+
+      <h2>What stays on your Mac</h2>
+      <ul class="plain">
+        <li>A rolling recording of your screen. Only the last minute is kept —
+          everything older is thrown away continuously.</li>
+        <li>It is never uploaded. If an organiser flags something, that minute is
+          saved to a folder on <em>this</em> machine and they come and look at it.
+          A single still is sent so they know whether it is worth the walk.</li>
+      </ul>
+
+      <h2>Other things you should know</h2>
+      <ul class="plain">
+        <li>macOS will show a screen-recording icon in your menu bar the whole
+          time. That is this app, and it is expected.</li>
+        <li>Closing this app is against the hackathon rules. Nothing here
+          punishes you for it — an organiser sees it and decides.</li>
+        <li>Window titles are deleted at the end of the event.</li>
+        <li>How to quit and uninstall afterwards is in the README that came with
+          the app, and on the last screen here.</li>
+      </ul>
+      <p class="note">Covered by the hackathon privacy policy you accepted at sign-up.</p>
+    </div>
+
+    <div class="row" style="justify-content:center">
+      <button id="consentNo" class="ghost">Quit</button>
+      <button id="consentYes" class="solid">I understand — continue</button>
+    </div>
+  </div>
+</section>
+
+<!-- 2. macOS permissions -->
+<section id="scPerms" class="screen mid">
+  <div class="wrap">
+    <div class="mark">The Forge</div>
+    <h1>Two macOS permissions</h1>
+    <p>macOS will not let the agent do its job until you grant these.</p>
+
+    <div class="card">
+      <div class="perm">
+        <span id="dotScreen" class="dot"></span>
+        <div class="body">
+          <div class="name">Screen &amp; System Audio Recording</div>
+          <div class="why">Required. Without it the agent records a blank screen
+            and nobody finds out until an organiser opens the clip.</div>
+          <div class="row" style="margin-top:10px">
+            <button class="ghost" data-open="screen">Open System Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="perm">
+        <span id="dotAx" class="dot"></span>
+        <div class="body">
+          <div class="name">Accessibility</div>
+          <div class="why">Needed to read window titles. Skip it and the agent
+            reports running applications only — organisers will see that it is
+            switched off.</div>
+          <div class="row" style="margin-top:10px">
+            <button id="axPrompt" class="ghost">Request</button>
+            <button class="ghost" data-open="accessibility">Open System Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note warn" id="permsNote">
+      macOS does not apply a new screen-recording grant to an app that is already
+      running. Once you have ticked it, the agent has to restart.
+    </p>
+
+    <div class="row" style="justify-content:center">
+      <button id="permsRestart" class="ghost">Restart the agent</button>
+      <button id="permsNext" class="solid" disabled>Continue</button>
+    </div>
+  </div>
+</section>
+
+<!-- 3. sign in -->
+<section id="scLogin" class="screen mid">
+  <div class="wrap" style="max-width:380px">
+    <div class="mark">The Forge</div>
+    <h1>Sign in</h1>
+    <p>Use the account you signed up to the hackathon with.</p>
+
+    <form id="loginForm" style="text-align:left;margin-top:22px">
+      <label class="k" for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label class="k" for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="msg" id="loginMsg"></div>
+      <button id="loginBtn" class="solid" type="submit" style="width:100%">Sign in</button>
+    </form>
+    <div id="googleWrap" style="display:none">
+      <div class="or"><span>or</span></div>
+      <button id="googleBtn" class="ghost" style="width:100%">Continue with Google</button>
+      <div class="msg" id="googleMsg"></div>
+    </div>
+
+    <p class="note" style="margin-top:18px">
+      Signed up with Google? Use the button above — a Google account has no
+      password to type here. Otherwise, reset yours on the hackathon site.
+    </p>
+  </div>
+</section>
+
+<!-- 4. frozen by an organiser -->
+<section id="scFrozen" class="screen mid">
+  <div class="wrap">
+    <div class="mark">The Forge</div>
+    <h1 style="font-size:34px">Stop working</h1>
+    <p style="font-size:15px">An organiser has paused your machine. Leave this
+       open and go and speak to them — it unlocks from their dashboard.</p>
+    <p class="note warn" id="frozenWhen"></p>
+  </div>
+</section>
+
+<!-- 5. running -->
+<section id="scRun" class="screen">
+  <div class="wrap" style="max-width:860px">
+    <div class="statusbar">
+      <div class="live">
+        <span id="liveDot" class="dot"></span>
+        <span id="liveText">Connecting…</span>
+      </div>
+      <div class="row">
+        <span class="note" id="whoami"></span>
+        <button id="signOut" class="ghost">Sign out</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="tile"><div class="v" id="tBuffer">—</div><div class="k">Screen buffer</div></div>
+      <div class="tile"><div class="v" id="tTitles">—</div><div class="k">Window titles</div></div>
+      <div class="tile"><div class="v" id="tSample">—</div><div class="k">Last report</div></div>
+      <div class="tile"><div class="v" id="tPulls">0</div><div class="k">Clips requested</div></div>
+    </div>
+
+    <h2>What was last reported</h2>
+    <div class="feed" id="feed"></div>
+
+    <p class="note" style="margin-top:28px">
+      Leave this open for the whole hackathon. Closing it is against the rules and
+      shows on the organisers' dashboard immediately.
+      <a href="#" id="revealBtn" style="color:var(--dim)">Show the saved-clips folder</a>.
+    </p>
+  </div>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
