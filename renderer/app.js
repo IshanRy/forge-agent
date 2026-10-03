@@ -64,6 +64,11 @@ let host = { host: "mac", displayCount: 1, version: "1.0.0", dev: false };
 
 let permPoll = null;
 
+// Each build of an unsigned app looks like a new app to macOS, so a tick left
+// over from a previous download shows as on in System Settings while
+// counting for nothing. This is by far the commonest "it says allowed".
+const STALE_GRANT = "If The Forge Agent is already ticked, that tick belongs to an older copy of the app: select it, click the minus button to remove it, then restart — this copy will appear so you can tick it.";
+
 function paintPerms(p) {
   const screenOk = p.screen === "granted";
   $("dotScreen").className = `dot ${screenOk ? "ok" : "no"}`;
@@ -81,7 +86,7 @@ function paintPerms(p) {
   $("permsNext").textContent = screenOk || host.dev ? "Continue" : "Continue anyway";
   $("permsNote").textContent = screenOk
     ? "Screen recording is on. Accessibility can be granted at any time — the agent picks it up on its own."
-    : "macOS does not apply a new screen-recording grant to an app that is already running. Once you have ticked it, the agent has to restart.";
+    : "macOS does not apply a new screen-recording grant to an app that is already running. Once you have ticked it, the agent has to restart. " + STALE_GRANT;
 }
 
 async function gatePermissions() {
@@ -113,6 +118,7 @@ document.querySelectorAll("[data-open]").forEach((b) => {
 });
 $("axPrompt").onclick = () => window.forge.promptAccessibility();
 $("permsRestart").onclick = () => window.forge.relaunch();
+$("capRestart").onclick = () => window.forge.relaunch();
 
 /* ================================================================ capture */
 
@@ -121,7 +127,8 @@ let activeRecorder = null;
 let currentSegment = null;
 let segments = [];
 let rotating = false;
-let captureState = "off";   // off | on | denied | stopped
+let captureState = "off";   // off | on | denied | failed | stopped
+let captureRetry = null;
 
 function pickMime() {
   // VP8, not VP9: this is a software encode of a screen source, and VP9's
@@ -191,8 +198,16 @@ async function startCapture() {
     stream = await navigator.mediaDevices.getDisplayMedia({
       video: { frameRate: { ideal: 4, max: 5 }, width: { max: 1280 }, height: { max: 800 } },
     });
-  } catch {
-    captureState = "denied";
+  } catch (err) {
+    // Only call it "not permitted" when macOS says so. Anything else — a
+    // display waking, the capture service hiccuping — gets retried, rather
+    // than parked under a label that sends people to a setting that's fine.
+    const p = await window.forge.checkPermissions().catch(() => ({}));
+    captureState = p.screen === "granted" ? "failed" : "denied";
+    console.warn("capture failed:", err && err.name, "macOS says:", p.screen);
+    if (captureState === "failed" && !captureRetry) {
+      captureRetry = setTimeout(() => { captureRetry = null; startCapture().then(() => paintRunning()); }, 15000);
+    }
     return;
   }
 
@@ -483,8 +498,13 @@ function paintRunning(sample) {
   $("tBuffer").textContent =
     captureState === "on" ? `${bufferSeconds()}s held`
       : captureState === "denied" ? "Not permitted"
+        : captureState === "failed" ? "Retrying…"
         : captureState === "stopped" ? "Stopped"
           : "Off";
+
+  $("capHelp").hidden = captureState !== "denied";
+  $("capHelpText").textContent =
+    "macOS hasn't given this copy of the agent screen recording. Tick The Forge Agent under Screen Recording, then restart. " + STALE_GRANT;
 
   $("tTitles").textContent =
     titlesState === "ok" ? "Reporting"
